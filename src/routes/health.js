@@ -1,9 +1,9 @@
-import { Router } from 'express';
-import { env } from '../config/env';
-import { supabaseAdmin } from '../lib/supabase';
-import { asyncHandler } from '../middleware/asyncHandler';
+import express from 'express';
+import { env } from '../config/env.js';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
-const router = Router();
+const router = express.Router();
 
 router.get('/', (_req, res) => {
   res.json({

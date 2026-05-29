@@ -1,5 +1,5 @@
 import pino from 'pino';
-import { env } from '../config/env';
+import { env } from '../config/env.js';
 
 export const logger = pino({
   level: env.logLevel,
@@ -8,5 +8,3 @@ export const logger = pino({
     ? {}
     : { transport: { target: 'pino-pretty', options: { colorize: true } } }),
 });
-
-export type Logger = typeof logger;

@@ -43,27 +43,32 @@ service-role key and enforces tenant scope from the authenticated request.
 
 ## Backend layout
 
-```
+Plain **Node.js (ES Modules)** — Express, no build step, run with `node`.
+
+```text
 src/
-  config/env.ts          typed, validated environment
-  lib/                   supabase clients, logger, phone/segment helpers
+  config/env.js          validated environment loader
+  lib/                   supabase clients, logger, phone/segment helpers, ApiError
   middleware/            auth (Supabase JWT + API key), errors, async wrapper
   services/
-    textsms.ts           TextSMS provider client (dry-run capable)
-    wallet.ts            credit ledger (wraps sms_debit_wallet RPC)
-    sender.ts            sender-id CRUD + approval
-    campaign.ts          the send engine (reserve → send → log → refund)
-    mpesa.ts             Daraja OAuth + STK push + callback handling
+    textsms.js           TextSMS provider client (dry-run capable)
+    wallet.js            credit ledger (wraps sms_debit_wallet RPC)
+    sender.js            sender-id CRUD + approval
+    campaign.js          the send engine (reserve → send → log → refund)
+    mpesa.js             Daraja OAuth + STK push + callback handling
   routes/                health, wallet, sender-ids, campaigns, sms, payments, webhooks
-  server.ts              app wiring (helmet, cors, rate-limit, routers)
+  server.js              app wiring (helmet, cors, rate-limit, routers)
 ```
 
 ## Quick start
 
+Requires Node.js ≥ 20.6.
+
 ```bash
 npm install
 cp .env.example .env        # fill in SUPABASE keys (+ provider keys when ready)
-npm run dev                  # http://localhost:3003
+npm run dev                  # node --watch, http://localhost:3003
+# production: npm start
 ```
 
 With `SMS_DRY_RUN=true` and `MPESA_DRY_RUN=true` (the defaults) the full flow

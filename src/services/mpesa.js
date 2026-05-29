@@ -1,10 +1,10 @@
 import axios from 'axios';
-import { env } from '../config/env';
-import { logger } from '../lib/logger';
-import { supabaseAdmin } from '../lib/supabase';
-import { ApiError } from '../middleware/types';
-import { normalizeKePhone } from '../lib/phone';
-import { applyLedger } from './wallet';
+import { env } from '../config/env.js';
+import { logger } from '../lib/logger.js';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { ApiError } from '../lib/apiError.js';
+import { normalizeKePhone } from '../lib/phone.js';
+import { applyLedger } from './wallet.js';
 
 /**
  * M-Pesa Daraja STK Push (Lipa na M-Pesa Online).
@@ -20,9 +20,9 @@ import { applyLedger } from './wallet';
 
 const base = env.mpesa.baseUrl.replace(/\/$/, '');
 
-let cachedToken: { value: string; expiresAt: number } | null = null;
+let cachedToken = null;
 
-function dryRun(): boolean {
+function dryRun() {
   return (
     env.mpesa.dryRun ||
     !env.mpesa.consumerKey ||
@@ -32,49 +32,41 @@ function dryRun(): boolean {
   );
 }
 
-async function getAccessToken(): Promise<string> {
+async function getAccessToken() {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return cachedToken.value;
 
   const auth = Buffer.from(`${env.mpesa.consumerKey}:${env.mpesa.consumerSecret}`).toString('base64');
-  const { data } = await axios.get(
-    `${base}/oauth/v1/generate?grant_type=client_credentials`,
-    { headers: { Authorization: `Basic ${auth}` }, timeout: 15000 },
-  );
-  const token = data.access_token as string;
+  const { data } = await axios.get(`${base}/oauth/v1/generate?grant_type=client_credentials`, {
+    headers: { Authorization: `Basic ${auth}` },
+    timeout: 15000,
+  });
+  const token = data.access_token;
   const ttl = Number(data.expires_in ?? 3599) * 1000;
   cachedToken = { value: token, expiresAt: Date.now() + ttl };
   return token;
 }
 
-function timestamp(): string {
+function timestamp() {
   const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
+  const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
-export interface StkPushResult {
-  checkout_request_id: string;
-  merchant_request_id: string;
-  customer_message: string;
-  amount: number;
-  credits: number;
-}
-
 /** KES amount -> SMS credits (whole credits). */
-export function amountToCredits(amount: number): number {
+export function amountToCredits(amount) {
   return Math.floor(amount / env.creditPriceKes);
 }
 
-export async function initiateStkPush(opts: {
-  tenantId: string;
-  phone: string;
-  amount: number;
-  accountReference?: string;
-}): Promise<StkPushResult> {
+/**
+ * @param {{ tenantId: string, phone: string, amount: number, accountReference?: string }} opts
+ */
+export async function initiateStkPush(opts) {
   const phone = normalizeKePhone(opts.phone);
   if (!phone) throw new ApiError(422, 'invalid_phone', 'Invalid M-Pesa phone number');
   const amount = Math.floor(opts.amount);
-  if (!Number.isFinite(amount) || amount < 1) throw new ApiError(422, 'invalid_amount', 'Amount must be at least KES 1');
+  if (!Number.isFinite(amount) || amount < 1) {
+    throw new ApiError(422, 'invalid_amount', 'Amount must be at least KES 1');
+  }
 
   const credits = amountToCredits(amount);
   const accountReference = (opts.accountReference || 'EZZAHCOMM').slice(0, 12);
@@ -105,7 +97,7 @@ export async function initiateStkPush(opts: {
   const ts = timestamp();
   const password = Buffer.from(`${env.mpesa.shortcode}${env.mpesa.passkey}${ts}`).toString('base64');
 
-  let data: Record<string, unknown>;
+  let data;
   try {
     const resp = await axios.post(
       `${base}/mpesa/stkpush/v1/processrequest`,
@@ -160,8 +152,8 @@ export async function initiateStkPush(opts: {
  * Process the Daraja callback. Idempotent: a repeated success callback for an
  * already-completed transaction will not double-credit the wallet.
  */
-export async function handleStkCallback(body: unknown): Promise<{ ok: boolean; credited: boolean }> {
-  const cb = (body as any)?.Body?.stkCallback;
+export async function handleStkCallback(body) {
+  const cb = body?.Body?.stkCallback;
   if (!cb) throw new ApiError(400, 'invalid_callback', 'Missing stkCallback');
 
   const checkoutRequestId = String(cb.CheckoutRequestID);
@@ -192,7 +184,7 @@ export async function handleStkCallback(body: unknown): Promise<{ ok: boolean; c
   }
 
   // Extract receipt from CallbackMetadata
-  const items: Array<{ Name: string; Value: unknown }> = cb.CallbackMetadata?.Item ?? [];
+  const items = cb.CallbackMetadata?.Item ?? [];
   const meta = Object.fromEntries(items.map((i) => [i.Name, i.Value]));
   const receipt = meta.MpesaReceiptNumber ? String(meta.MpesaReceiptNumber) : null;
   const paidAmount = meta.Amount ? Number(meta.Amount) : Number(txn.amount);
@@ -239,15 +231,7 @@ export async function handleStkCallback(body: unknown): Promise<{ ok: boolean; c
   return { ok: true, credited: true };
 }
 
-async function persistTransaction(opts: {
-  tenantId: string;
-  phone: string;
-  amount: number;
-  accountReference: string;
-  transactionDesc: string;
-  checkoutRequestId: string;
-  merchantRequestId: string;
-}) {
+async function persistTransaction(opts) {
   const { error } = await supabaseAdmin.from('mobile_money_transactions').insert({
     tenant_id: opts.tenantId,
     phone: opts.phone,

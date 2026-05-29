@@ -1,18 +1,16 @@
-import { Router } from 'express';
-import { asyncHandler } from '../middleware/asyncHandler';
-import { supabaseAdmin } from '../lib/supabase';
-import { logger } from '../lib/logger';
-import { handleStkCallback } from '../services/mpesa';
+import express from 'express';
+import { asyncHandler } from '../middleware/asyncHandler.js';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { logger } from '../lib/logger.js';
+import { handleStkCallback } from '../services/mpesa.js';
 
-const router = Router();
+const router = express.Router();
 
-async function recordEvent(provider: string, eventType: string, payload: unknown) {
-  await supabaseAdmin
+async function recordEvent(provider, eventType, payload) {
+  const { error } = await supabaseAdmin
     .from('webhook_events')
-    .insert({ provider, event_type: eventType, payload })
-    .then(({ error }) => {
-      if (error) logger.warn({ err: error }, 'webhook_events insert failed');
-    });
+    .insert({ provider, event_type: eventType, payload });
+  if (error) logger.warn({ err: error }, 'webhook_events insert failed');
 }
 
 /**

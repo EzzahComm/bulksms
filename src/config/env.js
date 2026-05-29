@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-function required(name: string): string {
+function required(name) {
   const v = process.env[name];
   if (!v) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -10,28 +10,29 @@ function required(name: string): string {
   return v;
 }
 
-function optional(name: string, fallback = ''): string {
+function optional(name, fallback = '') {
   return process.env[name] ?? fallback;
 }
 
-function bool(name: string, fallback = false): boolean {
+function bool(name, fallback = false) {
   const v = process.env[name];
   if (v === undefined) return fallback;
   return ['1', 'true', 'yes', 'on'].includes(v.toLowerCase());
 }
 
-function num(name: string, fallback: number): number {
+function num(name, fallback) {
   const v = process.env[name];
   if (v === undefined) return fallback;
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
+const nodeEnv = optional('NODE_ENV', 'development');
 const mpesaEnv = optional('MPESA_ENV', 'sandbox');
 
 export const env = {
-  nodeEnv: optional('NODE_ENV', 'development'),
-  isProd: optional('NODE_ENV', 'development') === 'production',
+  nodeEnv,
+  isProd: nodeEnv === 'production',
   port: num('PORT', 3003),
   serviceName: optional('SERVICE_NAME', 'ezzahcomm-bulk-sms'),
   logLevel: optional('LOG_LEVEL', 'info'),
@@ -80,6 +81,8 @@ export const env = {
 
   // Auth
   apiKeyPrefix: optional('API_KEY_PREFIX', 'ezk_live_'),
-};
 
-export type Env = typeof env;
+  // Rate limiting
+  rateLimitWindowMs: num('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
+  rateLimitMax: num('RATE_LIMIT_MAX_REQUESTS', 300),
+};

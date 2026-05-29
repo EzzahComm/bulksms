@@ -1,17 +1,7 @@
-import { supabaseAdmin } from '../lib/supabase';
-import { ApiError } from '../middleware/types';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { ApiError } from '../lib/apiError.js';
 
-export interface SenderId {
-  id: string;
-  tenant_id: string;
-  sender_name: string;
-  status: string;
-  description: string | null;
-  provider: string;
-  created_at: string;
-}
-
-export async function listSenderIds(tenantId: string) {
+export async function listSenderIds(tenantId) {
   const { data, error } = await supabaseAdmin
     .from('sms_sender_ids')
     .select('id, sender_name, status, description, provider, provider_status, rejection_reason, created_at, approved_at')
@@ -21,18 +11,10 @@ export async function listSenderIds(tenantId: string) {
   return data;
 }
 
-export async function createSenderId(
-  tenantId: string,
-  senderName: string,
-  description?: string,
-): Promise<SenderId> {
+export async function createSenderId(tenantId, senderName, description) {
   const name = senderName.trim();
   if (!/^[A-Za-z0-9 ]{3,11}$/.test(name)) {
-    throw new ApiError(
-      422,
-      'invalid_sender_name',
-      'Sender ID must be 3–11 alphanumeric characters',
-    );
+    throw new ApiError(422, 'invalid_sender_name', 'Sender ID must be 3–11 alphanumeric characters');
   }
 
   const { data, error } = await supabaseAdmin
@@ -51,23 +33,19 @@ export async function createSenderId(
   // NOTE: forwarding to the provider's sender-ID registration API happens here
   // once provider onboarding credentials are available. Until then the request
   // stays 'pending' for manual admin approval.
-  return data as SenderId;
+  return data;
 }
 
 /** Resolve an approved sender for sending. Accepts sender_id (uuid) or sender_name. */
-export async function resolveApprovedSender(
-  tenantId: string,
-  ref: string,
-): Promise<{ id: string; sender_name: string }> {
+export async function resolveApprovedSender(tenantId, ref) {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
-  const query = supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('sms_sender_ids')
     .select('id, sender_name, status')
     .eq('tenant_id', tenantId)
     .eq(isUuid ? 'id' : 'sender_name', ref)
     .maybeSingle();
 
-  const { data, error } = await query;
   if (error) throw new ApiError(500, 'sender_read_failed', error.message);
   if (!data) throw new ApiError(404, 'sender_not_found', 'Sender ID not found');
   if (data.status !== 'approved') {
@@ -77,14 +55,8 @@ export async function resolveApprovedSender(
 }
 
 /** Admin/staff approval workflow. */
-export async function setSenderStatus(
-  tenantId: string,
-  senderId: string,
-  status: 'approved' | 'rejected' | 'suspended',
-  approverId?: string,
-  rejectionReason?: string,
-) {
-  const patch: Record<string, unknown> = { status };
+export async function setSenderStatus(tenantId, senderId, status, approverId, rejectionReason) {
+  const patch = { status };
   if (status === 'approved') {
     patch.approved_at = new Date().toISOString();
     patch.approved_by = approverId ?? null;

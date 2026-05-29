@@ -1,12 +1,12 @@
-import { Router } from 'express';
+import express from 'express';
 import { z } from 'zod';
-import { authenticate } from '../middleware/auth';
-import { asyncHandler } from '../middleware/asyncHandler';
-import { AuthedRequest, ApiError } from '../middleware/types';
-import { supabaseAdmin } from '../lib/supabase';
-import { initiateStkPush } from '../services/mpesa';
+import { authenticate } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
+import { ApiError } from '../lib/apiError.js';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { initiateStkPush } from '../services/mpesa.js';
 
-const router = Router();
+const router = express.Router();
 router.use(authenticate);
 
 const topupSchema = z.object({
@@ -17,10 +17,10 @@ const topupSchema = z.object({
 /** Start an M-Pesa STK push to buy SMS credits. */
 router.post(
   '/mpesa/stk',
-  asyncHandler(async (req: AuthedRequest, res) => {
+  asyncHandler(async (req, res) => {
     const body = topupSchema.parse(req.body);
     const result = await initiateStkPush({
-      tenantId: req.auth!.tenantId,
+      tenantId: req.auth.tenantId,
       phone: body.phone,
       amount: body.amount,
       accountReference: 'SMS',
@@ -32,12 +32,12 @@ router.post(
 /** Poll the status of a top-up transaction. */
 router.get(
   '/mpesa/:checkoutRequestId',
-  asyncHandler(async (req: AuthedRequest, res) => {
+  asyncHandler(async (req, res) => {
     const { data, error } = await supabaseAdmin
       .from('mobile_money_transactions')
       .select('checkout_request_id, amount, status, result_desc, mpesa_receipt_number, created_at, updated_at')
-      .eq('tenant_id', req.auth!.tenantId)
-      .eq('checkout_request_id', req.params.checkoutRequestId)
+      .eq('tenant_id', req.auth.tenantId)
+      .eq('checkout_request_id', String(req.params.checkoutRequestId))
       .maybeSingle();
     if (error) throw new ApiError(500, 'txn_read_failed', error.message);
     if (!data) throw new ApiError(404, 'txn_not_found', 'Transaction not found');

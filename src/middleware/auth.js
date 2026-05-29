@@ -1,9 +1,12 @@
-import { Response, NextFunction } from 'express';
-import { createHash } from 'crypto';
-import { supabaseAnon, supabaseAdmin } from '../lib/supabase';
-import { AuthedRequest, ApiError } from './types';
+import { createHash } from 'node:crypto';
+import { supabaseAnon, supabaseAdmin } from '../lib/supabase.js';
+import { ApiError } from '../lib/apiError.js';
 
-export function hashApiKey(rawKey: string): string {
+/**
+ * @param {string} rawKey
+ * @returns {string}
+ */
+export function hashApiKey(rawKey) {
   return createHash('sha256').update(rawKey).digest('hex');
 }
 
@@ -13,12 +16,9 @@ export function hashApiKey(rawKey: string): string {
  *   Authorization: ApiKey <raw-key>        (developer / programmatic)
  *
  * Resolves the caller's tenant_id from the server side — never from the body.
+ * Populates req.auth = { authType, tenantId, userId?, role?, apiKeyId? }.
  */
-export async function authenticate(
-  req: AuthedRequest,
-  _res: Response,
-  next: NextFunction,
-): Promise<void> {
+export async function authenticate(req, _res, next) {
   try {
     const header = req.headers.authorization;
     if (!header) throw new ApiError(401, 'unauthorized', 'Missing Authorization header');
@@ -78,7 +78,7 @@ export async function authenticate(
 }
 
 /** Requires the JWT caller to be tenant admin/staff. API keys are tenant-scoped already. */
-export function requireStaff(req: AuthedRequest, _res: Response, next: NextFunction): void {
+export function requireStaff(req, _res, next) {
   if (req.auth?.authType === 'api_key') return next();
   if (req.auth?.role && ['admin', 'staff'].includes(req.auth.role)) return next();
   next(new ApiError(403, 'forbidden', 'Staff role required'));

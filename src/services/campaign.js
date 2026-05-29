@@ -1,50 +1,41 @@
-import { supabaseAdmin } from '../lib/supabase';
-import { env } from '../config/env';
-import { logger } from '../lib/logger';
-import { ApiError } from '../middleware/types';
-import { normalizeKePhone, countSegments } from '../lib/phone';
-import { resolveApprovedSender } from './sender';
-import { applyLedger } from './wallet';
-import { textSms } from './textsms';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { env } from '../config/env.js';
+import { logger } from '../lib/logger.js';
+import { ApiError } from '../lib/apiError.js';
+import { normalizeKePhone, countSegments } from '../lib/phone.js';
+import { resolveApprovedSender } from './sender.js';
+import { applyLedger } from './wallet.js';
+import { textSms } from './textsms.js';
 
-export interface SendCampaignInput {
-  tenantId: string;
-  name: string;
-  message: string;
-  sender: string; // sender_id uuid or sender_name
-  recipients: string[];
-  scheduledAt?: string | null;
-  createdBy?: string;
-}
-
-export interface CampaignResult {
-  campaign_id: string;
-  status: string;
-  recipients: number;
-  valid: number;
-  invalid: string[];
-  segments: number;
-  credits_per_message: number;
-  credits_estimated: number;
-  credits_charged: number;
-  sent: number;
-  failed: number;
-  scheduled: boolean;
-}
+/**
+ * @typedef {Object} SendCampaignInput
+ * @property {string} tenantId
+ * @property {string} name
+ * @property {string} message
+ * @property {string} sender         sender_id uuid or sender_name
+ * @property {string[]} recipients
+ * @property {string|null} [scheduledAt]
+ * @property {string} [createdBy]
+ */
 
 const INSERT_CHUNK = 500;
 
-export async function createAndSendCampaign(input: SendCampaignInput): Promise<CampaignResult> {
+/**
+ * @param {SendCampaignInput} input
+ */
+export async function createAndSendCampaign(input) {
   const { tenantId, message } = input;
   const name = input.name?.trim() || `Campaign ${new Date().toISOString()}`;
 
   if (!message?.trim()) throw new ApiError(422, 'empty_message', 'Message is required');
-  if (!input.recipients?.length) throw new ApiError(422, 'no_recipients', 'At least one recipient is required');
+  if (!input.recipients?.length) {
+    throw new ApiError(422, 'no_recipients', 'At least one recipient is required');
+  }
 
   // 1. Normalise + dedupe recipients
-  const seen = new Set<string>();
-  const valid: string[] = [];
-  const invalid: string[] = [];
+  const seen = new Set();
+  const valid = [];
+  const invalid = [];
   for (const raw of input.recipients) {
     const n = normalizeKePhone(raw);
     if (!n) invalid.push(raw);
@@ -86,7 +77,7 @@ export async function createAndSendCampaign(input: SendCampaignInput): Promise<C
     .select('id')
     .single();
   if (cErr || !campaign) throw new ApiError(500, 'campaign_create_failed', cErr?.message ?? 'failed');
-  const campaignId = campaign.id as string;
+  const campaignId = campaign.id;
 
   // 5. Insert recipient rows (pending)
   await insertRecipients(campaignId, tenantId, valid);
@@ -107,7 +98,10 @@ export async function createAndSendCampaign(input: SendCampaignInput): Promise<C
       campaignId,
     });
   } catch (err) {
-    await supabaseAdmin.from('sms_campaigns').update({ status: 'failed', completed_at: new Date().toISOString() }).eq('id', campaignId);
+    await supabaseAdmin
+      .from('sms_campaigns')
+      .update({ status: 'failed', completed_at: new Date().toISOString() })
+      .eq('id', campaignId);
     throw err;
   }
 
@@ -120,10 +114,10 @@ export async function createAndSendCampaign(input: SendCampaignInput): Promise<C
   let sent = 0;
   let failed = 0;
   const nowIso = new Date().toISOString();
-  const logRows: Record<string, unknown>[] = [];
+  const logRows = [];
 
   for (const r of providerResults) {
-    const recipientId = r.clientRef!;
+    const recipientId = r.clientRef;
     const ok = r.success;
     if (ok) sent++;
     else failed++;
@@ -135,7 +129,7 @@ export async function createAndSendCampaign(input: SendCampaignInput): Promise<C
         provider_message_id: r.providerMessageId ?? null,
         credits_charged: ok ? creditsPerMessage : 0,
         error_code: ok ? null : String(r.responseCode ?? 'ERR'),
-        error_message: ok ? null : r.error ?? null,
+        error_message: ok ? null : (r.error ?? null),
       })
       .eq('id', recipientId);
 
@@ -147,7 +141,7 @@ export async function createAndSendCampaign(input: SendCampaignInput): Promise<C
       status: ok ? 'sent' : 'failed',
       provider: 'textsms',
       provider_ref: r.providerMessageId ?? null,
-      error: ok ? null : r.error ?? null,
+      error: ok ? null : (r.error ?? null),
       sent_at: ok ? nowIso : null,
     });
   }
@@ -187,7 +181,7 @@ export async function createAndSendCampaign(input: SendCampaignInput): Promise<C
   return result(campaignId, finalStatus, input.recipients.length, valid.length, invalid, segments, creditsPerMessage, creditsEstimated, creditsCharged, sent, failed, false);
 }
 
-export async function listCampaigns(tenantId: string, limit = 50, offset = 0) {
+export async function listCampaigns(tenantId, limit = 50, offset = 0) {
   const { data, error } = await supabaseAdmin
     .from('sms_campaigns')
     .select('id, name, status, recipient_count, sent_count, failed_count, delivered_count, credits_used, scheduled_at, created_at, completed_at')
@@ -198,7 +192,7 @@ export async function listCampaigns(tenantId: string, limit = 50, offset = 0) {
   return data;
 }
 
-export async function getCampaign(tenantId: string, campaignId: string) {
+export async function getCampaign(tenantId, campaignId) {
   const { data, error } = await supabaseAdmin
     .from('sms_campaigns')
     .select('*')
@@ -212,7 +206,7 @@ export async function getCampaign(tenantId: string, campaignId: string) {
 
 // ---------- helpers ----------
 
-async function insertRecipients(campaignId: string, tenantId: string, phones: string[]) {
+async function insertRecipients(campaignId, tenantId, phones) {
   for (let i = 0; i < phones.length; i += INSERT_CHUNK) {
     const rows = phones.slice(i, i + INSERT_CHUNK).map((phone) => ({
       campaign_id: campaignId,
@@ -225,8 +219,8 @@ async function insertRecipients(campaignId: string, tenantId: string, phones: st
   }
 }
 
-async function loadRecipientIds(campaignId: string): Promise<Array<{ id: string; phone: string }>> {
-  const out: Array<{ id: string; phone: string }> = [];
+async function loadRecipientIds(campaignId) {
+  const out = [];
   let from = 0;
   const page = 1000;
   for (;;) {
@@ -236,34 +230,21 @@ async function loadRecipientIds(campaignId: string): Promise<Array<{ id: string;
       .eq('campaign_id', campaignId)
       .range(from, from + page - 1);
     if (error) throw new ApiError(500, 'recipient_read_failed', error.message);
-    out.push(...(data as Array<{ id: string; phone: string }>));
+    out.push(...data);
     if (!data || data.length < page) break;
     from += page;
   }
   return out;
 }
 
-async function insertLogs(rows: Record<string, unknown>[]) {
+async function insertLogs(rows) {
   for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
     const { error } = await supabaseAdmin.from('sms_logs').insert(rows.slice(i, i + INSERT_CHUNK));
     if (error) logger.error({ err: error }, 'sms_logs insert failed');
   }
 }
 
-function result(
-  campaign_id: string,
-  status: string,
-  recipients: number,
-  valid: number,
-  invalid: string[],
-  segments: number,
-  credits_per_message: number,
-  credits_estimated: number,
-  credits_charged: number,
-  sent: number,
-  failed: number,
-  scheduled: boolean,
-): CampaignResult {
+function result(campaign_id, status, recipients, valid, invalid, segments, credits_per_message, credits_estimated, credits_charged, sent, failed, scheduled) {
   return {
     campaign_id,
     status,

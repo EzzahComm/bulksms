@@ -1,22 +1,23 @@
-import express, { Express } from 'express';
+import { fileURLToPath } from 'node:url';
+import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import pinoHttp from 'pino-http';
 import rateLimit from 'express-rate-limit';
 
-import { env } from './config/env';
-import { logger } from './lib/logger';
-import { notFound, errorHandler } from './middleware/error';
+import { env } from './config/env.js';
+import { logger } from './lib/logger.js';
+import { notFound, errorHandler } from './middleware/error.js';
 
-import { healthRouter } from './routes/health';
-import { walletRouter } from './routes/wallet';
-import { sendersRouter } from './routes/senders';
-import { campaignsRouter } from './routes/campaigns';
-import { smsRouter } from './routes/sms';
-import { paymentsRouter } from './routes/payments';
-import { webhooksRouter } from './routes/webhooks';
+import { healthRouter } from './routes/health.js';
+import { walletRouter } from './routes/wallet.js';
+import { sendersRouter } from './routes/senders.js';
+import { campaignsRouter } from './routes/campaigns.js';
+import { smsRouter } from './routes/sms.js';
+import { paymentsRouter } from './routes/payments.js';
+import { webhooksRouter } from './routes/webhooks.js';
 
-export function createApp(): Express {
+export function createApp() {
   const app = express();
 
   app.set('trust proxy', 1);
@@ -38,8 +39,8 @@ export function createApp(): Express {
 
   // Authenticated API (rate limited)
   const apiLimiter = rateLimit({
-    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 300,
+    windowMs: env.rateLimitWindowMs,
+    max: env.rateLimitMax,
     standardHeaders: true,
     legacyHeaders: false,
   });
@@ -57,7 +58,9 @@ export function createApp(): Express {
   return app;
 }
 
-if (require.main === module) {
+// Start the server only when run directly (not when imported).
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMain) {
   const app = createApp();
   app.listen(env.port, () => {
     logger.info(

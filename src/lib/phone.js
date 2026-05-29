@@ -16,10 +16,12 @@ const GSM_EXT = '^{}\\[~]|€';
 /**
  * Normalise a Kenyan phone number to the 2547XXXXXXXX / 2541XXXXXXXX form.
  * Returns null if it can't be made valid.
+ * @param {string} input
+ * @returns {string|null}
  */
-export function normalizeKePhone(input: string): string | null {
+export function normalizeKePhone(input) {
   if (!input) return null;
-  let s = input.replace(/[\s\-()]/g, '');
+  let s = String(input).replace(/[\s\-()]/g, '');
   if (s.startsWith('+')) s = s.slice(1);
 
   if (/^0[17]\d{8}$/.test(s)) s = '254' + s.slice(1); // 07.. / 01.. -> 2547.. / 2541..
@@ -28,8 +30,12 @@ export function normalizeKePhone(input: string): string | null {
   return /^254[17]\d{8}$/.test(s) ? s : null;
 }
 
-/** Count GSM segments for billing. */
-export function countSegments(message: string): number {
+/**
+ * Count GSM segments for billing.
+ * @param {string} message
+ * @returns {number}
+ */
+export function countSegments(message) {
   let unicode = false;
   let length = 0;
 
@@ -45,9 +51,8 @@ export function countSegments(message: string): number {
   }
 
   if (unicode) {
-    // UCS-2: count code units
     const units = [...message].reduce(
-      (acc, ch) => acc + (ch.codePointAt(0)! > 0xffff ? 2 : 1),
+      (acc, ch) => acc + (ch.codePointAt(0) > 0xffff ? 2 : 1),
       0,
     );
     if (units <= UCS2_SINGLE_LIMIT) return 1;

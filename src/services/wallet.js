@@ -1,18 +1,12 @@
-import { supabaseAdmin } from '../lib/supabase';
-import { ApiError } from '../middleware/types';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { ApiError } from '../lib/apiError.js';
 
-export interface WalletSummary {
-  tenant_id: string;
-  balance_credits: number;
-  total_topup: number;
-  total_spent: number;
-  currency: string;
-}
-
-export type LedgerType = 'topup' | 'sms_debit' | 'refund' | 'adjustment';
+/**
+ * @typedef {'topup'|'sms_debit'|'refund'|'adjustment'} LedgerType
+ */
 
 /** Returns the tenant wallet, creating an empty one if it doesn't exist yet. */
-export async function getWallet(tenantId: string): Promise<WalletSummary> {
+export async function getWallet(tenantId) {
   const { data, error } = await supabaseAdmin
     .from('sms_wallets')
     .select('tenant_id, balance_credits, total_topup, total_spent, currency')
@@ -36,18 +30,12 @@ export async function getWallet(tenantId: string): Promise<WalletSummary> {
 /**
  * Applies a credit ledger entry atomically via the SECURITY DEFINER DB function.
  * For 'sms_debit' pass a positive credit amount; the function negates it and
- * rejects the entry if it would overdraw the wallet.
- * Returns the created ledger row id.
+ * rejects the entry if it would overdraw the wallet. Returns the ledger row id.
+ *
+ * @param {{ tenantId: string, credits: number, type: LedgerType, reference?: string, description?: string, campaignId?: string, paymentId?: string }} opts
+ * @returns {Promise<string>}
  */
-export async function applyLedger(opts: {
-  tenantId: string;
-  credits: number;
-  type: LedgerType;
-  reference?: string;
-  description?: string;
-  campaignId?: string;
-  paymentId?: string;
-}): Promise<string> {
+export async function applyLedger(opts) {
   const { data, error } = await supabaseAdmin.rpc('sms_debit_wallet', {
     p_tenant_id: opts.tenantId,
     p_credits: opts.credits,
@@ -64,10 +52,10 @@ export async function applyLedger(opts: {
     }
     throw new ApiError(500, 'ledger_failed', error.message);
   }
-  return data as string;
+  return data;
 }
 
-export async function listTransactions(tenantId: string, limit = 50, offset = 0) {
+export async function listTransactions(tenantId, limit = 50, offset = 0) {
   const { data, error } = await supabaseAdmin
     .from('sms_credit_transactions')
     .select('id, type, credits_delta, balance_after, amount, reference, description, created_at')
@@ -79,12 +67,12 @@ export async function listTransactions(tenantId: string, limit = 50, offset = 0)
   return data;
 }
 
-function normalize(row: Record<string, unknown>): WalletSummary {
+function normalize(row) {
   return {
-    tenant_id: row.tenant_id as string,
+    tenant_id: row.tenant_id,
     balance_credits: Number(row.balance_credits),
     total_topup: Number(row.total_topup),
     total_spent: Number(row.total_spent),
-    currency: (row.currency as string) ?? 'KES',
+    currency: row.currency ?? 'KES',
   };
 }

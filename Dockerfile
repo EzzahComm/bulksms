@@ -2,28 +2,19 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Install production dependencies
 COPY package*.json ./
-COPY tsconfig.json ./
+RUN npm ci --omit=dev
 
-# Install dependencies
-RUN npm ci
-
-# Copy source code
+# Copy application source (plain Node ESM — no build step)
 COPY src ./src
 
-# Build TypeScript
-RUN npm run build
-
-# Remove dev dependencies
-RUN npm ci --only=production
-
-# Expose port
+ENV NODE_ENV=production
 EXPOSE 3003
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3003/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+  CMD node -e "fetch('http://localhost:3003/health').then(r=>{if(r.status!==200)process.exit(1)}).catch(()=>process.exit(1))"
 
 # Start server
-CMD ["node", "dist/server.js"]
+CMD ["node", "src/server.js"]
