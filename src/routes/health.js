@@ -25,6 +25,7 @@ router.get(
       status: dbOk ? 'ready' : 'degraded',
       checks: {
         database: dbOk ? 'ok' : 'fail',
+        service_role: env.hasServiceKey ? 'configured' : 'MISSING',
         sms_mode: env.sms.dryRun || !env.sms.apiKey ? 'dry_run' : 'live',
         mpesa_mode: env.mpesa.dryRun || !env.mpesa.consumerKey ? 'dry_run' : env.mpesa.env,
       },

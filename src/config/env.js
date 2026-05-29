@@ -30,6 +30,11 @@ function num(name, fallback) {
 const nodeEnv = optional('NODE_ENV', 'development');
 const mpesaEnv = optional('MPESA_ENV', 'sandbox');
 
+// Service-role key: optional at boot. A leftover placeholder counts as missing.
+const rawServiceKey = optional('SUPABASE_SERVICE_ROLE_KEY');
+const hasServiceKey = !!rawServiceKey && !rawServiceKey.includes('PASTE');
+const serviceKey = hasServiceKey ? rawServiceKey : optional('SUPABASE_KEY');
+
 export const env = {
   nodeEnv,
   isProd: nodeEnv === 'production',
@@ -44,7 +49,12 @@ export const env = {
   // Supabase
   supabaseUrl: required('SUPABASE_URL'),
   supabaseAnonKey: required('SUPABASE_KEY'),
-  supabaseServiceKey: required('SUPABASE_SERVICE_ROLE_KEY'),
+  // Service-role key is required for real operation, but treated as optional at
+  // boot so the app can deploy and serve /health before it's configured. When
+  // absent, the admin client falls back to the anon key and DB-backed routes
+  // will fail (surfaced via /health/ready -> service_role: "MISSING").
+  supabaseServiceKey: serviceKey,
+  hasServiceKey,
 
   // Tenant (this Nexus tenant)
   tenantId: optional('EZZAHCOMM_TENANT_ID', 'e2200000-0000-4000-8000-000000000001'),
