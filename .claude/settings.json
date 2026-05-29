@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:Path += ';C:\\\\Program Files\\\\GitHub CLI'; if \\(Get-Command gh -ErrorAction SilentlyContinue\\) { Set-Location 'd:\\\\Claude\\\\Projects\\\\KITABU YETU\\\\kitabuyetu'; gh run list --branch main --limit 3 } else { 'gh not installed' })",
+      "Bash(curl -s 'https://api.github.com/repos/EzzahComm/kitabuyetu/actions/runs?head_sha=__TRACKED_VAR__&per_page=5')",
+      "Bash(curl -s \"https://api.github.com/repos/EzzahComm/kitabuyetu/actions/runs/26643695906/jobs\")"
+    ]
+  }
+}

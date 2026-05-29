@@ -1,0 +1,85 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+function required(name: string): string {
+  const v = process.env[name];
+  if (!v) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return v;
+}
+
+function optional(name: string, fallback = ''): string {
+  return process.env[name] ?? fallback;
+}
+
+function bool(name: string, fallback = false): boolean {
+  const v = process.env[name];
+  if (v === undefined) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(v.toLowerCase());
+}
+
+function num(name: string, fallback: number): number {
+  const v = process.env[name];
+  if (v === undefined) return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+const mpesaEnv = optional('MPESA_ENV', 'sandbox');
+
+export const env = {
+  nodeEnv: optional('NODE_ENV', 'development'),
+  isProd: optional('NODE_ENV', 'development') === 'production',
+  port: num('PORT', 3003),
+  serviceName: optional('SERVICE_NAME', 'ezzahcomm-bulk-sms'),
+  logLevel: optional('LOG_LEVEL', 'info'),
+  allowedOrigins: optional('ALLOWED_ORIGINS', 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
+
+  // Supabase
+  supabaseUrl: required('SUPABASE_URL'),
+  supabaseAnonKey: required('SUPABASE_KEY'),
+  supabaseServiceKey: required('SUPABASE_SERVICE_ROLE_KEY'),
+
+  // Tenant (this Nexus tenant)
+  tenantId: optional('EZZAHCOMM_TENANT_ID', 'e2200000-0000-4000-8000-000000000001'),
+
+  // Credit economics
+  creditPriceKes: num('CREDIT_PRICE_KES', 1), // KES per 1 SMS credit
+  creditsPerSegment: num('CREDITS_PER_SEGMENT', 1), // credits charged per 160-char segment
+
+  // TextSMS provider (sms.textsms.co.ke)
+  sms: {
+    dryRun: bool('SMS_DRY_RUN', false),
+    baseUrl: optional('TEXTSMS_BASE_URL', 'https://sms.textsms.co.ke'),
+    apiKey: optional('TEXTSMS_API_KEY'),
+    partnerId: optional('TEXTSMS_PARTNER_ID'),
+    defaultShortcode: optional('TEXTSMS_SHORTCODE', 'EZZAH'),
+  },
+
+  // M-Pesa Daraja
+  mpesa: {
+    env: mpesaEnv,
+    dryRun: bool('MPESA_DRY_RUN', false),
+    baseUrl:
+      optional('MPESA_BASE_URL') ||
+      (mpesaEnv === 'production'
+        ? 'https://api.safaricom.co.ke'
+        : 'https://sandbox.safaricom.co.ke'),
+    consumerKey: optional('MPESA_CONSUMER_KEY'),
+    consumerSecret: optional('MPESA_CONSUMER_SECRET'),
+    shortcode: optional('MPESA_SHORTCODE'),
+    passkey: optional('MPESA_PASSKEY'),
+    transactionType: optional('MPESA_TRANSACTION_TYPE', 'CustomerPayBillOnline'),
+    callbackUrl: optional('MPESA_CALLBACK_URL'),
+  },
+
+  // Auth
+  apiKeyPrefix: optional('API_KEY_PREFIX', 'ezk_live_'),
+};
+
+export type Env = typeof env;

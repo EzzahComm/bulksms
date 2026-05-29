@@ -1,0 +1,517 @@
+# EZZAHCOMM SMS SAAS — SCHEMA DOCUMENTATION
+
+## Overview
+
+This is a **production-grade Supabase PostgreSQL schema** for a multi-tenant SMS SaaS platform with:
+- ✅ Multi-tenant isolation via Row-Level Security (RLS)
+- ✅ Complete audit trail (Kenya ICTA compliance)
+- ✅ M-Pesa payment integration
+- ✅ Campaign + bulk SMS management
+- ✅ Wallet + credit system
+- ✅ API key management
+- ✅ Sender ID approval workflow
+
+---
+
+## Table Structure
+
+### Core Tables
+
+#### `tenants`
+The root organization entity. Each tenant is a separate customer.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `name` | TEXT | Company name |
+| `slug` | TEXT | URL-friendly identifier (unique) |
+| `email` | TEXT | Contact email |
+| `phone` | TEXT | Contact phone |
+| `country` | TEXT | Country code (default: 'KE') |
+| `status` | TEXT | 'active', 'suspended' |
+| `sms_rate` | NUMERIC | Credits per SMS (e.g., 1.00) |
+| `created_at` | TIMESTAMPTZ | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | Last update timestamp |
+
+**Key Relationships:**
+- One-to-many with `profiles` (team members)
+- One-to-one with `wallets` (credit balance)
+- One-to-many with `campaigns`, `transactions`, `sender_ids`, etc.
+
+**Example Use Case:**
+```sql
+-- Create a tenant
+INSERT INTO tenants (name, slug, email)
+VALUES ('Acme Corp', 'acme-corp', 'admin@acme.com');
+```
+
+---
+
+#### `profiles`
+User accounts linked to Supabase Auth.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Foreign key to `auth.users.id` |
+| `tenant_id` | UUID | Which tenant this user belongs to |
+| `email` | TEXT | Email address |
+| `first_name` | TEXT | First name |
+| `last_name` | TEXT | Last name |
+| `phone` | TEXT | Phone number |
+| `role` | ENUM | 'super_admin', 'tenant_admin', 'user', 'readonly' |
+| `created_at` | TIMESTAMPTZ | Created timestamp |
+| `updated_at` | TIMESTAMPTZ | Updated timestamp |
+
+**Roles:**
+- `super_admin`: Access to all tenants (admin only)
+- `tenant_admin`: Full access to their tenant + can approve sender IDs
+- `user`: Can send SMS, manage campaigns
+- `readonly`: View-only access
+
+**Key Constraint:**
+- Must have a Supabase Auth user first (`auth.users.id`)
+
+---
+
+#### `wallets`
+Credit balance ledger. One per tenant.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `tenant_id` | UUID | FK to `tenants` (UNIQUE) |
+| `balance_credits` | NUMERIC | Current credit balance |
+| `total_topup` | NUMERIC | Total credits purchased |
+| `total_spent` | NUMERIC | Total credits consumed |
+| `currency` | TEXT | Currency code (default: 'KES') |
+| `created_at` | TIMESTAMPTZ | Created timestamp |
+| `updated_at` | TIMESTAMPTZ | Updated timestamp |
+
+**Auto-created:** A wallet is automatically created when a tenant is inserted (via trigger).
+
+**Example:**
+```sql
+-- Check balance
+SELECT balance_credits FROM wallets WHERE tenant_id = 'tenant-uuid';
+```
+
+---
+
+#### `transactions`
+Complete audit trail of all credit movements.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `tenant_id` | UUID | FK to `tenants` |
+| `type` | ENUM | 'topup', 'sms_debit', 'refund', 'adjustment' |
+| `amount` | NUMERIC | Amount in KES (for topups) |
+| `credits_delta` | NUMERIC | Credits added/removed |
+| `balance_before` | NUMERIC | Balance before this transaction |
+| `balance_after` | NUMERIC | Balance after this transaction |
+| `reference` | TEXT | M-Pesa receipt, SMS ID, etc. |
+| `description` | TEXT | Human-readable description |
+| `metadata` | JSONB | Additional context (flexible) |
+| `created_at` | TIMESTAMPTZ | Timestamp |
+| `updated_at` | TIMESTAMPTZ | Updated timestamp |
+
+**Key Purpose:** Immutable log of every credit movement (required for Kenya ICTA compliance).
+
+**Example:**
+```sql
+-- Log an SMS debit
+INSERT INTO transactions (tenant_id, type, credits_delta, balance_before, balance_after, reference, description)
+VALUES (
+  'tenant-uuid',
+  'sms_debit',
+  -1.50,
+  100.00,
+  98.50,
+  'sms-123456',
+  'SMS sent to +254712345678'
+);
+```
+
+---
+
+### Sender ID Management
+
+#### `sender_ids`
+Registered sender IDs (e.g., "EZZAH") with approval workflow.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `tenant_id` | UUID | FK to `tenants` |
+| `sender_name` | TEXT | The actual sender ID (e.g., "EZZAH") |
+| `description` | TEXT | Why this sender ID is needed |
+| `status` | ENUM | 'pending', 'approved', 'rejected', 'suspended' |
+| `provider_id` | TEXT | External provider's ID (if synced) |
+| `provider_status` | TEXT | Status from SMS provider |
+| `approved_by` | UUID | Admin who approved this |
+| `rejection_reason` | TEXT | If rejected, why |
+| `created_at` | TIMESTAMPTZ | Submitted timestamp |
+| `updated_at` | TIMESTAMPTZ | Updated timestamp |
+| `approved_at` | TIMESTAMPTZ | Approval timestamp |
+
+**Approval Workflow:**
+1. User submits sender ID → `status = 'pending'`
+2. Admin approves → `status = 'approved'` + `approved_by` set
+3. System syncs to SMS provider (optional)
+4. If rejected → `status = 'rejected'` + `rejection_reason` set
+
+**Constraint:** Only one sender ID per tenant (unique on tenant_id + sender_name).
+
+---
+
+### SMS Campaign Management
+
+#### `campaigns`
+Bulk SMS campaigns with scheduling and tracking.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `tenant_id` | UUID | FK to `tenants` |
+| `name` | TEXT | Campaign name (e.g., "Black Friday Sale") |
+| `message` | TEXT | SMS message content |
+| `sender_id` | UUID | FK to `sender_ids` |
+| `status` | ENUM | 'draft', 'queued', 'sending', 'sent', 'failed' |
+| `recipient_count` | INT | Total recipients in campaign |
+| `sent_count` | INT | Successfully sent |
+| `failed_count` | INT | Failed sends |
+| `total_credits_estimated` | NUMERIC | Estimated cost |
+| `total_credits_used` | NUMERIC | Actual cost |
+| `scheduled_at` | TIMESTAMPTZ | When to send (optional) |
+| `created_at` | TIMESTAMPTZ | Created timestamp |
+| `updated_at` | TIMESTAMPTZ | Updated timestamp |
+| `started_at` | TIMESTAMPTZ | When sending began |
+| `completed_at` | TIMESTAMPTZ | When sending completed |
+
+**Status Flow:**
+- `draft` → User is building the campaign
+- `queued` → Campaign scheduled, waiting to send
+- `sending` → SMS delivery in progress
+- `sent` → All sent (some may have failed)
+- `failed` → Campaign couldn't start (e.g., no credits)
+
+---
+
+#### `recipients`
+Per-recipient delivery tracking within a campaign.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `campaign_id` | UUID | FK to `campaigns` |
+| `tenant_id` | UUID | FK to `tenants` |
+| `phone` | TEXT | Recipient phone number |
+| `status` | ENUM | 'pending', 'sent', 'failed', 'delivered', 'bounced' |
+| `provider_message_id` | TEXT | SMS provider's message ID |
+| `error_code` | TEXT | If failed, error code |
+| `error_message` | TEXT | If failed, error description |
+| `delivered_at` | TIMESTAMPTZ | When SMS was delivered |
+| `created_at` | TIMESTAMPTZ | Created timestamp |
+| `updated_at` | TIMESTAMPTZ | Updated timestamp |
+
+**Use Case:** Track individual SMS within bulk campaigns.
+
+---
+
+#### `sms_logs`
+Complete log of every individual SMS sent (replaces recipients for single SMS).
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `tenant_id` | UUID | FK to `tenants` |
+| `campaign_id` | UUID | FK to `campaigns` (nullable if single SMS) |
+| `sender_id` | UUID | FK to `sender_ids` |
+| `phone` | TEXT | Recipient phone |
+| `message` | TEXT | Exact message sent |
+| `message_length` | INT | Character count |
+| `credits_charged` | NUMERIC | Credits deducted |
+| `provider_id` | TEXT | SMS provider's message ID |
+| `provider_response` | JSONB | Full API response from provider |
+| `status` | ENUM | 'pending', 'sent', 'failed', 'delivered', 'bounced' |
+| `delivered_at` | TIMESTAMPTZ | Delivery timestamp |
+| `error_code` | TEXT | If failed |
+| `error_message` | TEXT | If failed |
+| `created_at` | TIMESTAMPTZ | Sent timestamp |
+| `updated_at` | TIMESTAMPTZ | Updated timestamp |
+
+**Key Purpose:** Immutable log for auditing, troubleshooting, and analytics.
+
+---
+
+### Payment Management
+
+#### `payments`
+M-Pesa payment tracking and wallet top-up records.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `tenant_id` | UUID | FK to `tenants` |
+| `phone` | TEXT | Customer phone (for STK Push) |
+| `amount` | NUMERIC | KES amount received |
+| `credits_allocated` | NUMERIC | Credits added to wallet |
+| `currency` | TEXT | Currency code (default: 'KES') |
+| `mpesa_receipt` | TEXT | M-Pesa receipt number (unique) |
+| `mpesa_transaction_id` | TEXT | M-Pesa transaction ID (unique) |
+| `status` | ENUM | 'pending', 'success', 'failed', 'cancelled' |
+| `error_code` | TEXT | If failed |
+| `error_message` | TEXT | If failed |
+| `metadata` | JSONB | Additional M-Pesa data |
+| `created_at` | TIMESTAMPTZ | Payment initiated timestamp |
+| `updated_at` | TIMESTAMPTZ | Updated timestamp |
+| `completed_at` | TIMESTAMPTZ | Payment confirmed timestamp |
+
+**Workflow:**
+1. User initiates STK Push → `status = 'pending'`
+2. M-Pesa callback arrives → `status = 'success'` + `mpesa_receipt` + `completed_at` set
+3. System creates transaction in `transactions` table
+4. Wallet balance updated automatically
+
+---
+
+#### `api_keys`
+Developer API credentials for programmatic access.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `tenant_id` | UUID | FK to `tenants` |
+| `key_hash` | TEXT | SHA256 hash of the key (stored, not the key itself) |
+| `key_preview` | TEXT | Last 8 chars for display (e.g., "...abc123") |
+| `name` | TEXT | Key name (e.g., "Mobile App") |
+| `is_active` | BOOLEAN | Whether key can be used |
+| `last_used_at` | TIMESTAMPTZ | When it was last used |
+| `created_at` | TIMESTAMPTZ | Created timestamp |
+| `expires_at` | TIMESTAMPTZ | Expiration timestamp (optional) |
+
+**Security:** Keys are hashed; only hash is stored. Never store plaintext.
+
+---
+
+### Audit & Compliance
+
+#### `audit_logs`
+Kenya ICTA compliance log of all actions.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `tenant_id` | UUID | FK to `tenants` |
+| `user_id` | UUID | FK to `auth.users` (nullable if system) |
+| `action` | TEXT | What happened (e.g., 'sms_sent', 'payment_received') |
+| `entity_type` | TEXT | What was affected (e.g., 'sms', 'payment') |
+| `entity_id` | TEXT | ID of the affected entity |
+| `changes` | JSONB | Before/after values |
+| `ip_address` | INET | IP address of the request |
+| `user_agent` | TEXT | Browser/client info |
+| `status` | TEXT | 'success', 'failure' |
+| `error_message` | TEXT | If failed |
+| `created_at` | TIMESTAMPTZ | Timestamp |
+
+**Required by:** Kenya Information and Communications Act (ICTA) for audit trails.
+
+---
+
+## Row-Level Security (RLS) Policies
+
+All tables have RLS enabled. Key policies:
+
+### Tenant Isolation
+Users can **only** see data for their tenant:
+```sql
+-- Example: In sms_logs, users see only their tenant's logs
+WHERE EXISTS (
+  SELECT 1 FROM profiles
+  WHERE profiles.id = auth.uid()
+  AND profiles.tenant_id = sms_logs.tenant_id
+)
+```
+
+### Admin Access
+Tenant admins can approve sender IDs and manage team members:
+```sql
+-- Example: Only tenant admins can approve sender IDs
+WHERE role IN ('super_admin', 'tenant_admin')
+AND profiles.tenant_id = sender_ids.tenant_id
+```
+
+---
+
+## Indexes
+
+Optimized for common queries:
+
+```
+Wallets:
+  - tenant_id (one wallet per tenant)
+
+Transactions:
+  - tenant_id (filter by tenant)
+  - type (analytics by type)
+  - created_at (time-series queries)
+  - reference (M-Pesa receipt lookup)
+
+Sender IDs:
+  - tenant_id (list tenant's IDs)
+  - status (find pending approvals)
+  - (tenant_id, sender_name) UNIQUE
+
+Campaigns:
+  - tenant_id (list campaigns)
+  - status (find active campaigns)
+  - scheduled_at (find scheduled campaigns)
+
+Recipients:
+  - campaign_id (find recipients of campaign)
+  - status (filter by delivery status)
+
+SMS Logs:
+  - tenant_id (filter by tenant)
+  - campaign_id (find SMS in campaign)
+  - provider_id (match delivery reports)
+
+Payments:
+  - tenant_id (tenant's payments)
+  - status (find successful payments)
+  - mpesa_receipt (idempotency)
+
+Audit Logs:
+  - tenant_id (for compliance audits)
+  - action (filter by action type)
+  - created_at (time-range queries)
+```
+
+---
+
+## Triggers & Automation
+
+### Auto-create Wallet
+When a tenant is created, a wallet is automatically initialized with 0 credits.
+
+```sql
+-- Triggered on INSERT into tenants
+-- Creates: INSERT INTO wallets (tenant_id, balance_credits) VALUES (new_tenant_id, 0)
+```
+
+### Update Wallet Balance
+When a transaction is recorded, the wallet is updated.
+
+```sql
+-- Triggered on INSERT into transactions
+-- Updates: wallets.balance_credits = NEW.balance_after
+```
+
+---
+
+## Views
+
+### `tenant_analytics`
+Real-time dashboard metrics.
+
+```sql
+SELECT
+  tenant_id,
+  balance_credits,
+  sms_sent_today,
+  sms_failed_today,
+  revenue_today,
+  total_sms_today,
+  report_date
+FROM tenant_analytics;
+```
+
+---
+
+## Deployment Instructions
+
+### Step 1: Create Supabase Project
+1. Go to [supabase.com](https://supabase.com)
+2. Create new project
+3. Copy project URL and API key
+4. Wait for database to initialize
+
+### Step 2: Apply Schema
+1. In Supabase dashboard, go to **SQL Editor**
+2. Click **New Query**
+3. Copy entire contents of `01_schema_init.sql`
+4. Paste into SQL editor
+5. Click **Run**
+6. Wait for all tables to be created
+
+### Step 3: Enable RLS
+All RLS is included in the schema. Verify in **Table Editor** → each table should show 🔐 lock icon.
+
+### Step 4: Create Test User
+1. Go to **Authentication** → **Users**
+2. Click **Add user** → Email/Password
+3. Create test user (e.g., `test@ezzahcomm.co.ke`)
+4. Copy user ID (UUID)
+
+### Step 5: Link User to Tenant
+In SQL Editor, run:
+```sql
+-- Create test tenant
+INSERT INTO tenants (name, slug, email) VALUES ('Test Co', 'test-co', 'test@ezzahcomm.co.ke');
+
+-- Get the tenant ID from the insert
+-- Then link the auth user to this tenant
+INSERT INTO profiles (id, tenant_id, email, role)
+VALUES ('USER_UUID_HERE', 'TENANT_UUID_HERE', 'test@ezzahcomm.co.ke', 'tenant_admin');
+```
+
+### Step 6: Test RLS
+1. Go to **Table Editor**
+2. Click **tenants** table
+3. You should see the test tenant
+
+---
+
+## Kenya ICTA Compliance
+
+The schema includes audit trail requirements:
+
+- ✅ `audit_logs` table captures all actions
+- ✅ `transactions` table is immutable (no updates)
+- ✅ `sms_logs` records every SMS sent
+- ✅ User/timestamp tracking on all operations
+- ✅ IP address and user agent logging
+
+**For ICTA Compliance Report:**
+```sql
+-- Query audit logs for the last 90 days
+SELECT 
+  user_id, 
+  action, 
+  entity_type, 
+  created_at, 
+  ip_address
+FROM audit_logs
+WHERE created_at >= NOW() - INTERVAL '90 days'
+ORDER BY created_at DESC;
+```
+
+---
+
+## Next Steps
+
+✅ Schema deployed
+→ Phase 2: Node.js API (routes, services, middleware)
+→ Phase 3: Admin Dashboard (Next.js)
+→ Phase 4: Client Portal (Next.js)
+→ Phase 5: M-Pesa Integration
+→ Phase 6: SMS Provider Integration
+→ Phase 7: Vercel Deployment
+
+---
+
+## Questions?
+
+- **RLS not working?** Ensure all policies are created (check SQL output for errors)
+- **Table not appearing?** Refresh the Table Editor or check SQL error messages
+- **User can't access data?** Verify tenant_id matches in profiles and other tables

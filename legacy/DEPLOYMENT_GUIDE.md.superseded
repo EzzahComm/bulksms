@@ -1,0 +1,536 @@
+# EZZAHCOMM SMS SAAS — SUPABASE DEPLOYMENT GUIDE
+
+## Quick Start (5 minutes)
+
+### 1. Create Supabase Project
+```bash
+# Go to https://supabase.com
+# Click "New Project"
+# Fill in:
+#   - Name: "ezzahcomm-sms"
+#   - Password: (save securely)
+#   - Region: "us-east-1" (or closest to your market)
+#   - Pricing: "Pro" (for production, or free for dev)
+
+# Once created, you'll see:
+# - Project URL: https://xxxxx.supabase.co
+# - Public API Key: anon_xxxxx
+# - Service Role Key: sbp_xxxxx (keep secret!)
+```
+
+### 2. Apply the Schema
+```
+1. Open https://xxxxx.supabase.co/project/default/sql
+2. Click "New Query"
+3. Open file: 01_schema_init.sql
+4. Copy entire contents
+5. Paste into SQL editor
+6. Click "Run" button
+7. Wait 30 seconds for all queries to execute
+```
+
+**Expected output:**
+```
+✓ CREATE EXTENSION
+✓ CREATE TYPE (5 times)
+✓ CREATE TABLE (11 times)
+✓ CREATE INDEX (20+ times)
+✓ ALTER TABLE (11 times for RLS)
+✓ CREATE POLICY (many)
+✓ CREATE VIEW
+✓ CREATE FUNCTION (2)
+✓ CREATE TRIGGER (2)
+✓ GRANT (permissions)
+✓ INSERT (seed data)
+```
+
+### 3. Verify Schema in Table Editor
+```
+1. Go to https://xxxxx.supabase.co/project/default/editor
+2. You should see tables:
+   ✓ tenants
+   ✓ profiles
+   ✓ wallets
+   ✓ transactions
+   ✓ sender_ids
+   ✓ campaigns
+   ✓ recipients
+   ✓ sms_logs
+   ✓ payments
+   ✓ api_keys
+   ✓ audit_logs
+```
+
+Each table should have a 🔐 lock icon (RLS enabled).
+
+### 4. Create First Test User
+```
+1. Go to https://xxxxx.supabase.co/project/default/auth/users
+2. Click "Add user" → "Email"
+3. Fill in:
+   - Email: test@ezzahcomm.co.ke
+   - Password: TestPass123!
+   - Auto Confirm User: Yes
+4. Click "Create User"
+5. Copy the User ID (UUID)
+```
+
+### 5. Link User to Tenant
+In SQL Editor, run:
+
+```sql
+-- Step 1: Create test tenant
+INSERT INTO tenants (name, slug, email, phone, country)
+VALUES (
+  'Test Company',
+  'test-company',
+  'test@ezzahcomm.co.ke',
+  '+254712345678',
+  'KE'
+);
+
+-- Get the tenant_id from the insert (or query):
+SELECT id FROM tenants WHERE slug = 'test-company';
+-- Copy the UUID
+```
+
+Then:
+```sql
+-- Step 2: Link auth user to tenant
+-- Replace COPY_TENANT_UUID and COPY_USER_UUID with values above
+INSERT INTO profiles (id, tenant_id, email, first_name, role)
+VALUES (
+  'COPY_USER_UUID',
+  'COPY_TENANT_UUID',
+  'test@ezzahcomm.co.ke',
+  'Test',
+  'tenant_admin'
+);
+```
+
+### 6. Test Wallet Creation
+The wallet is auto-created. Verify:
+
+```sql
+SELECT * FROM wallets WHERE tenant_id = 'COPY_TENANT_UUID';
+```
+
+Should see:
+```
+| id | tenant_id | balance_credits | currency | created_at |
+|----|-----------|----|----------|------------|
+| xxx | your-uuid | 0 | KES | timestamp |
+```
+
+### 7. Test RLS
+```sql
+-- In Table Editor, click "wallets"
+-- You should see 1 row (the test wallet)
+
+-- If you see 0 rows, RLS may not be working correctly
+-- Check SQL Editor for errors in RLS policy creation
+```
+
+---
+
+## Detailed Deployment Steps
+
+### Create Supabase Project
+
+**Pre-requisites:**
+- Supabase account (free or Pro)
+- Kenya region recommended (lower latency)
+
+**Steps:**
+1. Go to [supabase.com/dashboard](https://supabase.com/dashboard)
+2. Click **+ New Project**
+3. Fill form:
+   - **Organization:** Your org (or create new)
+   - **Name:** `ezzahcomm-sms`
+   - **Database Password:** Save in password manager
+   - **Region:** `us-east-1` (US East) or `eu-west-1` (Europe)
+   - **Pricing Plan:** 
+     - Development: Free tier (limited)
+     - Production: Pro ($25/mo minimum)
+4. Click **Create New Project**
+5. Wait 2–3 minutes for database to initialize
+
+**Once Created, You'll See:**
+```
+Project Settings → API
+├── Project URL: https://xxxxx.supabase.co
+├── Anon Public Key: anon_xxxxx
+└── Service Role Key: sbp_xxxxx (keep secret!)
+```
+
+Copy these—you'll need them for the Node.js backend.
+
+---
+
+### Apply Schema to Database
+
+**Method 1: Supabase UI (Easiest)**
+
+1. Open SQL Editor:
+   ```
+   https://xxxxx.supabase.co/project/default/sql
+   ```
+
+2. Create new query:
+   - Click **New Query** button
+   - Or press `Ctrl+K` and type "New Query"
+
+3. Paste schema:
+   - Open `01_schema_init.sql` in text editor
+   - Copy all contents
+   - Paste into Supabase SQL editor
+
+4. Execute:
+   - Click **Run** (or `Ctrl+Enter`)
+   - Wait 30 seconds for completion
+
+5. Check results:
+   - All statements should show ✓ (green checkmark)
+   - If any fail, error message appears
+   - Common errors:
+     ```
+     ERROR: extension already exists
+     → This is OK, means it was already enabled
+     
+     ERROR: syntax error at line XXX
+     → Check SQL syntax in that line
+     ```
+
+**Method 2: Supabase CLI (Advanced)**
+
+If you have Supabase CLI installed:
+
+```bash
+# Install Supabase CLI
+npm install -g supabase
+
+# Link to your project
+supabase link --project-ref xxxxx
+
+# Apply migrations
+supabase db push --file 01_schema_init.sql
+```
+
+---
+
+### Verify Schema in Table Editor
+
+Go to **Table Editor**:
+```
+https://xxxxx.supabase.co/project/default/editor
+```
+
+You should see:
+```
+Tables
+├── audit_logs        🔐
+├── api_keys          🔐
+├── campaigns         🔐
+├── payments          🔐
+├── profiles          🔐
+├── recipients        🔐
+├── sender_ids        🔐
+├── sms_logs          🔐
+├── tenants           🔐
+├── transactions      🔐
+└── wallets           🔐
+```
+
+The 🔐 icon means RLS (Row-Level Security) is enabled.
+
+**If tables don't appear:**
+- Refresh page
+- Check SQL Editor output for errors
+- Verify all CREATE TABLE statements ran successfully
+
+---
+
+### Enable Authentication
+
+Go to **Authentication**:
+```
+https://xxxxx.supabase.co/project/default/auth/providers
+```
+
+Default enabled providers:
+- Email/Password ✓
+- (Optional) GitHub OAuth
+- (Optional) Google OAuth
+
+For MVP, Email/Password is sufficient.
+
+---
+
+### Create Test User
+
+Go to **Authentication → Users**:
+```
+https://xxxxx.supabase.co/project/default/auth/users
+```
+
+Click **Add user**:
+```
+Email:             test@ezzahcomm.co.ke
+Password:          TestPass123!
+Auto Confirm:      Yes (toggle)
+```
+
+Click **Create user**.
+
+**After creation, you'll see:**
+```
+User ID:    11111111-2222-3333-4444-555555555555
+Email:      test@ezzahcomm.co.ke
+Created:    Just now
+```
+
+Copy the User ID—you need it for the next step.
+
+---
+
+### Link User to Tenant
+
+In **SQL Editor**, run these queries:
+
+**Query 1: Create test tenant**
+```sql
+INSERT INTO tenants (name, slug, email, phone, country)
+VALUES (
+  'Ezzahcomm Test',
+  'ezzahcomm-test',
+  'admin@ezzahcomm.co.ke',
+  '+254712345678',
+  'KE'
+)
+RETURNING id, name, slug;
+```
+
+**Expected result:**
+```
+| id                                   | name             | slug             |
+|--------------------------------------|------------------|------------------|
+| 22222222-3333-4444-5555-666666666666 | Ezzahcomm Test   | ezzahcomm-test   |
+```
+
+Copy the `id` (tenant UUID).
+
+**Query 2: Create admin profile for this user**
+```sql
+INSERT INTO profiles (id, tenant_id, email, first_name, last_name, role)
+VALUES (
+  '11111111-2222-3333-4444-555555555555',  -- User ID from auth
+  '22222222-3333-4444-5555-666666666666',  -- Tenant ID from previous query
+  'test@ezzahcomm.co.ke',
+  'Test',
+  'Admin',
+  'tenant_admin'
+);
+```
+
+**Expected result:**
+```
+insert into "public"."profiles" (id, tenant_id, email, first_name, last_name, role) values
+  (...)
+  executed successfully
+```
+
+---
+
+### Verify Tenant Setup
+
+**Query: Check wallet was auto-created**
+```sql
+SELECT id, tenant_id, balance_credits, currency, created_at
+FROM wallets
+WHERE tenant_id = '22222222-3333-4444-5555-666666666666';
+```
+
+**Expected result:**
+```
+| id                                   | tenant_id                            | balance_credits | currency | created_at            |
+|--------------------------------------|--------------------------------------|-----------------|----------|-----------------------|
+| 33333333-4444-5555-6666-777777777777 | 22222222-3333-4444-5555-666666666666 | 0.00            | KES      | 2024-05-28 12:34:56 UTC |
+```
+
+---
+
+### Test RLS (Row-Level Security)
+
+**Step 1: Go to Table Editor**
+```
+https://xxxxx.supabase.co/project/default/editor
+```
+
+**Step 2: Click "wallets" table**
+
+You should see **1 row** (the wallet we just created).
+
+**Why?** Because RLS is enabled, and you're viewing as the test user. They can only see their own tenant's wallet.
+
+**If you see 0 rows:**
+- RLS policy may not be working
+- Go back to SQL Editor
+- Search for "CREATE POLICY" statements
+- Check if any failed
+
+---
+
+## Production Deployment Checklist
+
+### Pre-Launch
+- [ ] Schema applied successfully (all 11 tables created)
+- [ ] RLS enabled on all tables (🔐 icon visible)
+- [ ] Test user created and linked to test tenant
+- [ ] Wallet auto-created for test tenant
+- [ ] Triggers working (test by inserting transaction)
+- [ ] Indexes created for performance
+
+### Security
+- [ ] Service Role Key stored in `.env.local` (NOT committed)
+- [ ] Public Key used only in client-side code
+- [ ] RLS policies verified for each table
+- [ ] Backups enabled in Supabase settings
+- [ ] Access logs reviewed (if Pro plan)
+
+### Data Integrity
+- [ ] All constraints applied (FK, UNIQUE, NOT NULL)
+- [ ] Default values set (created_at, status, etc.)
+- [ ] Triggers tested (wallet auto-create, balance updates)
+- [ ] Test transaction inserted and wallet updated
+
+### Monitoring
+- [ ] Database activity logged in Supabase dashboard
+- [ ] Query performance acceptable (no timeouts)
+- [ ] Backup schedule configured (daily recommended)
+
+---
+
+## Environment Variables
+
+Create `.env.local` in your Node.js project:
+
+```bash
+# Supabase
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_ANON_KEY=anon_xxxxx
+SUPABASE_SERVICE_ROLE_KEY=sbp_xxxxx
+
+# App
+APP_ENV=development
+APP_PORT=3000
+
+# M-Pesa (Phase 5)
+MPESA_CONSUMER_KEY=xxxxx
+MPESA_CONSUMER_SECRET=xxxxx
+MPESA_INITIATOR_NAME=testapi
+MPESA_INITIATOR_PASSWORD=xxxxx
+
+# SMS Provider (Phase 5)
+SMS_API_URL=https://api.textsms.co.ke/send
+SMS_API_KEY=xxxxx
+SMS_API_SECRET=xxxxx
+
+# Logging
+SENTRY_DSN=xxxxx (optional, Phase 7)
+```
+
+**Never commit `.env.local`** → Add to `.gitignore`.
+
+---
+
+## Troubleshooting
+
+### Schema not applying
+
+**Error: `extension already exists`**
+```
+→ This is OK. Extension is already enabled.
+→ Skip that line and continue.
+```
+
+**Error: `syntax error at line XXX`**
+```
+→ Check the SQL syntax at that line
+→ Common issues:
+   - Missing semicolon
+   - Typo in table name
+   - Reserved keyword not quoted
+```
+
+**Error: `permission denied`**
+```
+→ You're not logged in as the project owner
+→ Use the correct Supabase account
+→ Or ask the owner to apply the schema
+```
+
+### RLS not working
+
+**Issue: Users see all rows (RLS not enforcing)**
+
+1. Check RLS is enabled:
+   ```sql
+   SELECT tablename FROM pg_tables 
+   WHERE schemaname = 'public';
+   ```
+
+2. Check policies exist:
+   ```sql
+   SELECT * FROM pg_policies 
+   WHERE tablename = 'wallets';
+   ```
+
+3. If policies are missing, re-run the schema
+
+**Issue: Users see no rows (too restrictive)**
+
+1. Verify tenant_id in profiles matches
+2. Check `auth.uid()` returns the correct user ID
+3. Test with super_admin role (should bypass restrictions)
+
+### Wallet not auto-creating
+
+**Issue: No wallet row after inserting tenant**
+
+1. Check trigger exists:
+   ```sql
+   SELECT * FROM pg_trigger 
+   WHERE tgname = 'trigger_create_wallet_for_tenant';
+   ```
+
+2. If missing, run:
+   ```sql
+   CREATE TRIGGER trigger_create_wallet_for_tenant
+   AFTER INSERT ON public.tenants
+   FOR EACH ROW
+   EXECUTE FUNCTION public.create_wallet_for_tenant();
+   ```
+
+---
+
+## Next Steps
+
+✅ **Phase 1 Complete:** Schema deployed
+
+→ **Phase 2:** Node.js API
+- Fastify server setup
+- Auth routes (login/signup)
+- SMS service
+- Wallet/transaction routes
+- Rate limiting
+- Error handling
+
+Would you like me to start Phase 2 now?
+
+---
+
+## Support
+
+- **Supabase Docs:** https://supabase.com/docs
+- **Postgres Docs:** https://www.postgresql.org/docs/
+- **RLS Guide:** https://supabase.com/docs/guides/auth/row-level-security
