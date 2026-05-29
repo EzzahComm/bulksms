@@ -37,6 +37,16 @@ export function createApp() {
   }
   app.use(pinoHttp({ logger }));
 
+  // Root — service banner (avoids an unmatched-root hang on Vercel)
+  app.get('/', (_req, res) => {
+    res.json({
+      service: env.serviceName,
+      status: 'ok',
+      docs: 'https://github.com/EzzahComm/bulksms#api',
+      health: '/health',
+    });
+  });
+
   // Public
   app.use('/health', healthRouter);
   // Provider callbacks (unauthenticated, signature/idempotency handled inside)
