@@ -28,8 +28,13 @@ export function createApp() {
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: '15mb' }));
-  app.use(express.urlencoded({ extended: true }));
+  // On Vercel the Node runtime already parses req.body; running Express's
+  // parsers there would double-read the (already consumed) stream. Off-Vercel
+  // (local, Docker, other Node hosts) we parse here as usual.
+  if (!process.env.VERCEL) {
+    app.use(express.json({ limit: '15mb' }));
+    app.use(express.urlencoded({ extended: true }));
+  }
   app.use(pinoHttp({ logger }));
 
   // Public
