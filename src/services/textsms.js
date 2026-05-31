@@ -3,9 +3,10 @@ import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 
 /**
- * TextSMS Kenya provider client (https://sms.textsms.co.ke).
+ * Bulk SMS gateway client for TextSMS Kenya and Advanta Africa.
  *
- * Endpoints used:
+ * Both providers expose an identical API (same payload + endpoints); only the
+ * base host differs, selected via SMS_PROVIDER / SMS_BASE_URL (see config/env).
  *   POST /api/services/sendsms/    single message
  *   POST /api/services/sendbulk/   batched messages
  *   POST /api/services/getbalance/ account balance
@@ -23,6 +24,24 @@ import { logger } from '../lib/logger.js';
 
 const SUCCESS_CODES = new Set([200, 201, 1000]);
 
+// Gateway response codes (shared by TextSMS + Advanta) → human-readable reason.
+const ERROR_CODES = {
+  1001: 'Invalid sender ID / shortcode',
+  1002: 'Network not allowed',
+  1003: 'Invalid mobile number',
+  1004: 'Low bulk credits',
+  1005: 'Failed — system error',
+  1006: 'Invalid credentials (API key or partner ID)',
+  1007: 'Delivery failed',
+  1008: 'No delivery report',
+  1009: 'Unsupported data type',
+  1010: 'Unsupported request type',
+  4090: 'Internal error — retry after 5 minutes',
+  4091: 'No partner ID set',
+  4092: 'No API key provided',
+  4093: 'Account details not found',
+};
+
 export class TextSmsService {
   constructor() {
     this.baseUrl = env.sms.baseUrl.replace(/\/$/, '');
@@ -36,18 +55,20 @@ export class TextSmsService {
    * Send one message.
    * @returns {Promise<ProviderResult>}
    */
-  async sendSingle(phone, message, shortcode) {
-    const results = await this.sendBulk([{ phone, message }], shortcode);
+  async sendSingle(phone, message, shortcode, options = {}) {
+    const results = await this.sendBulk([{ phone, message }], shortcode, options);
     return results[0];
   }
 
   /**
    * Send a batch (chunked to 100 per request).
-   * @param {Array<{ phone: string, message: string, clientRef?: string }>} items
+   * @param {Array<{ phone: string, message: string, clientRef?: string, timeToSend?: string }>} items
    * @param {string} [shortcode]
+   * @param {{ timeToSend?: string }} [options]  optional provider-side schedule
+   *        (date string / Unix timestamp) applied to items without their own.
    * @returns {Promise<ProviderResult[]>}
    */
-  async sendBulk(items, shortcode) {
+  async sendBulk(items, shortcode, options = {}) {
     const sender = shortcode || env.sms.defaultShortcode;
 
     if (this.dryRun) {
@@ -64,14 +85,20 @@ export class TextSmsService {
     const chunks = chunk(items, 100);
 
     for (const batch of chunks) {
-      const smslist = batch.map((it, idx) => ({
-        partnerID: env.sms.partnerId,
-        apikey: env.sms.apiKey,
-        mobile: it.phone,
-        message: it.message,
-        shortcode: sender,
-        clientsmsid: it.clientRef ?? `${Date.now()}_${idx}`,
-      }));
+      const smslist = batch.map((it, idx) => {
+        const entry = {
+          partnerID: env.sms.partnerId,
+          apikey: env.sms.apiKey,
+          mobile: it.phone,
+          message: it.message,
+          shortcode: sender,
+          clientsmsid: it.clientRef ?? `${Date.now()}_${idx}`,
+        };
+        // Optional provider-side scheduling (date string or Unix timestamp).
+        const when = it.timeToSend ?? options.timeToSend;
+        if (when) entry.timeToSend = when;
+        return entry;
+      });
 
       try {
         const { data } = await axios.post(
@@ -121,7 +148,9 @@ export class TextSmsService {
         success,
         providerMessageId: r.messageid !== undefined ? String(r.messageid) : undefined,
         responseCode: code,
-        error: success ? undefined : (r['response-description'] ?? 'send_failed'),
+        error: success
+          ? undefined
+          : (ERROR_CODES[Number(code)] ?? r['response-description'] ?? 'send_failed'),
         clientRef: it.clientRef,
       };
     });

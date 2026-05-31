@@ -1,0 +1,14 @@
+$kind: http-request
+name: List Campaigns
+method: GET
+url: '{{baseUrl}}/api/campaigns'
+description: Returns a paginated list of SMS campaigns for the authenticated tenant.
+order: 1000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+queryParams:
+  - key: limit
+    value: '50'
+  - key: offset
+    value: '0'

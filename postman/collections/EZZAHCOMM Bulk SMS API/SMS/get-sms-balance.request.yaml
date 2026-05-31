@@ -1,0 +1,9 @@
+$kind: http-request
+name: Get SMS Balance
+method: GET
+url: '{{baseUrl}}/api/sms/balance'
+description: Returns the current wallet balance and provider SMS balance for the authenticated tenant.
+order: 3000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'

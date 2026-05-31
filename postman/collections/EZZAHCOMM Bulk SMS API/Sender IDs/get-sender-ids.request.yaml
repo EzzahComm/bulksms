@@ -1,0 +1,9 @@
+$kind: http-request
+name: List Sender IDs
+method: GET
+url: '{{baseUrl}}/api/sender-ids'
+description: Returns all registered sender IDs for the authenticated tenant.
+order: 1000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'

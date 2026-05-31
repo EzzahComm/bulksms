@@ -139,7 +139,7 @@ export async function createAndSendCampaign(input) {
       phone: r.phone,
       message,
       status: ok ? 'sent' : 'failed',
-      provider: 'textsms',
+      provider: env.sms.provider,
       provider_ref: r.providerMessageId ?? null,
       error: ok ? null : (r.error ?? null),
       sent_at: ok ? nowIso : null,

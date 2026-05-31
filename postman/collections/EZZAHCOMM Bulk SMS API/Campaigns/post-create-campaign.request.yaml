@@ -1,0 +1,21 @@
+$kind: http-request
+name: Create & Send Campaign
+method: POST
+url: '{{baseUrl}}/api/campaigns'
+description: Create and immediately send (or schedule) a new SMS campaign. Restricted to staff/admin roles.
+order: 3000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "My Campaign",
+      "message": "Hello World!",
+      "sender": "EZZAH",
+      "recipients": ["254712345678", "254798765432"],
+      "scheduled_at": null
+    }

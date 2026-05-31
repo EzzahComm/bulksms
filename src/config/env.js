@@ -30,6 +30,29 @@ function num(name, fallback) {
 const nodeEnv = optional('NODE_ENV', 'development');
 const mpesaEnv = optional('MPESA_ENV', 'sandbox');
 
+// SMS gateway provider. TextSMS Kenya and Advanta Africa expose an identical
+// API shape (same payload + endpoints), so only the base host differs. The
+// SMS_* env vars are the canonical names from the integration spec; the older
+// TEXTSMS_* names are still honoured for backward compatibility.
+const SMS_PROVIDER_BASE = {
+  textsms: 'https://sms.textsms.co.ke',
+  advanta: 'https://quicksms.advantasms.com',
+};
+const smsProviderSet = process.env.SMS_PROVIDER !== undefined && process.env.SMS_PROVIDER !== '';
+const smsProvider = (process.env.SMS_PROVIDER || 'textsms').toLowerCase();
+const smsBaseUrl = (
+  optional('SMS_BASE_URL') ||
+  optional('SMS_ENDPOINT') ||
+  // An explicitly chosen provider wins over the legacy TEXTSMS_BASE_URL so
+  // setting SMS_PROVIDER=advanta actually switches hosts.
+  (smsProviderSet ? SMS_PROVIDER_BASE[smsProvider] : '') ||
+  optional('TEXTSMS_BASE_URL') ||
+  SMS_PROVIDER_BASE[smsProvider] ||
+  SMS_PROVIDER_BASE.textsms
+)
+  .replace(/\/api\/services\/.*$/, '') // tolerate a full endpoint URL being supplied
+  .replace(/\/$/, '');
+
 // Service-role key: optional at boot. A leftover placeholder counts as missing.
 const rawServiceKey = optional('SUPABASE_SERVICE_ROLE_KEY');
 const hasServiceKey = !!rawServiceKey && !rawServiceKey.includes('PASTE');
@@ -63,13 +86,16 @@ export const env = {
   creditPriceKes: num('CREDIT_PRICE_KES', 1), // KES per 1 SMS credit
   creditsPerSegment: num('CREDITS_PER_SEGMENT', 1), // credits charged per 160-char segment
 
-  // TextSMS provider (sms.textsms.co.ke)
+  // SMS gateway (TextSMS / Advanta — identical API). SMS_* names are canonical;
+  // TEXTSMS_* are honoured as fallbacks so existing deployments keep working.
   sms: {
     dryRun: bool('SMS_DRY_RUN', false),
-    baseUrl: optional('TEXTSMS_BASE_URL', 'https://sms.textsms.co.ke'),
-    apiKey: optional('TEXTSMS_API_KEY'),
-    partnerId: optional('TEXTSMS_PARTNER_ID'),
-    defaultShortcode: optional('TEXTSMS_SHORTCODE', 'EZZAH'),
+    provider: smsProvider, // 'textsms' | 'advanta'
+    baseUrl: smsBaseUrl,
+    apiKey: optional('SMS_API_KEY') || optional('TEXTSMS_API_KEY'),
+    partnerId: optional('SMS_PARTNER_ID') || optional('TEXTSMS_PARTNER_ID'),
+    defaultShortcode:
+      optional('SMS_SENDER_ID') || optional('TEXTSMS_SHORTCODE') || 'EZZAH',
   },
 
   // M-Pesa Daraja

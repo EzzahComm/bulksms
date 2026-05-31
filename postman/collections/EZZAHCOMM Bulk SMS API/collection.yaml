@@ -1,0 +1,11 @@
+$kind: collection
+name: EZZAHCOMM Bulk SMS API
+description: |-
+  API collection for the EZZAHCOMM Bulk SMS platform. Supports SMS sending, campaign management, wallet top-up via M-Pesa, sender ID management, and webhook callbacks.
+
+  **Authentication:** Use `Authorization: ApiKey {{apiKey}}` for developer access, or `Authorization: Bearer {{token}}` for dashboard users.
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3003'
+  - key: apiKey
+    value: 'ezk_live_'

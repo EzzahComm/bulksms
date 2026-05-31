@@ -1,0 +1,6 @@
+$kind: http-request
+name: Readiness Check
+method: GET
+url: '{{baseUrl}}/health/ready'
+description: Readiness check that verifies DB and integration connectivity. Returns status, checks, and timestamp.
+order: 2000

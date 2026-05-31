@@ -1,0 +1,18 @@
+$kind: http-request
+name: Register Sender ID
+method: POST
+url: '{{baseUrl}}/api/sender-ids'
+description: Register a new sender ID for the authenticated tenant. Requires approval before use.
+order: 2000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "sender_name": "EZZAH",
+      "description": "Main sender ID for EZZAHCOMM"
+    }

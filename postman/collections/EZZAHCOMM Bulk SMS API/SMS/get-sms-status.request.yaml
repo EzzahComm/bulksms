@@ -1,0 +1,12 @@
+$kind: http-request
+name: Get SMS Campaign Status
+method: GET
+url: '{{baseUrl}}/api/sms/status/{{campaignId}}'
+description: Get the delivery status of an SMS campaign by its campaign ID.
+order: 2000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+pathVariables:
+  - key: campaignId
+    value: ''

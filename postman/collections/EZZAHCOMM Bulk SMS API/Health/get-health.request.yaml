@@ -1,0 +1,6 @@
+$kind: http-request
+name: Service Liveness
+method: GET
+url: '{{baseUrl}}/health'
+description: Returns service status, uptime, and environment info.
+order: 1000

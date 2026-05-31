@@ -1,0 +1,12 @@
+$kind: http-request
+name: Get Campaign by ID
+method: GET
+url: '{{baseUrl}}/api/campaigns/{{id}}'
+description: Retrieve a single campaign by its unique ID.
+order: 2000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+pathVariables:
+  - key: id
+    value: ''

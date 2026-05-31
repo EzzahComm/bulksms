@@ -1,0 +1,21 @@
+$kind: http-request
+name: Update Sender ID Status
+method: PATCH
+url: '{{baseUrl}}/api/sender-ids/{{id}}/status'
+description: Update the approval status of a sender ID. Restricted to staff/admin roles.
+order: 3000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+  - key: Content-Type
+    value: application/json
+pathVariables:
+  - key: id
+    value: ''
+body:
+  type: json
+  content: |-
+    {
+      "status": "approved",
+      "rejection_reason": ""
+    }

@@ -1,0 +1,18 @@
+$kind: http-request
+name: Initiate M-Pesa STK Push
+method: POST
+url: '{{baseUrl}}/api/payments/mpesa/stk'
+description: Initiates an M-Pesa STK push to the specified phone number to top up SMS credits.
+order: 1000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "phone": "254712345678",
+      "amount": 500
+    }

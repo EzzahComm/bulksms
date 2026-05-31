@@ -1,0 +1,14 @@
+$kind: http-request
+name: List Wallet Transactions
+method: GET
+url: '{{baseUrl}}/api/wallet/transactions'
+description: Returns a paginated list of wallet transactions for the authenticated tenant.
+order: 2000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+queryParams:
+  - key: limit
+    value: '50'
+  - key: offset
+    value: '0'

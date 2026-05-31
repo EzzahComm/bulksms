@@ -1,0 +1,12 @@
+$kind: http-request
+name: Get M-Pesa Transaction Status
+method: GET
+url: '{{baseUrl}}/api/payments/mpesa/{{checkoutRequestId}}'
+description: Poll the status of an M-Pesa STK push transaction using the checkout request ID.
+order: 2000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+pathVariables:
+  - key: checkoutRequestId
+    value: ''

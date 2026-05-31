@@ -1,0 +1,21 @@
+$kind: http-request
+name: Quick Send SMS
+method: POST
+url: '{{baseUrl}}/api/sms/send'
+description: Convenience endpoint to send SMS to one or more recipients. Supports ApiKey or Bearer authentication.
+order: 1000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "message": "Hello from EZZAHCOMM!",
+      "to": ["254712345678"],
+      "sender": "EZZAH",
+      "campaign_name": "Test Campaign",
+      "scheduled_at": null
+    }

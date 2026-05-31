@@ -1,0 +1,9 @@
+$kind: http-request
+name: Get Wallet Balance
+method: GET
+url: '{{baseUrl}}/api/wallet'
+description: Returns the current wallet balance for the authenticated tenant.
+order: 1000
+headers:
+  - key: Authorization
+    value: 'ApiKey {{apiKey}}'

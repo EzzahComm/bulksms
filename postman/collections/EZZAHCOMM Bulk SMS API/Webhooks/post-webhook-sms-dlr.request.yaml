@@ -1,0 +1,16 @@
+$kind: http-request
+name: TextSMS Delivery Report Callback
+method: POST
+url: '{{baseUrl}}/webhooks/sms-dlr'
+description: Webhook endpoint for TextSMS delivery report (DLR) callbacks. No authentication required — called by the SMS provider.
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "messageid": "MSG123456",
+      "dlrstatus": "delivered"
+    }

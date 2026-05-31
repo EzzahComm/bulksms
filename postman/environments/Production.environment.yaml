@@ -1,0 +1,81 @@
+name: Production
+values:
+  - key: baseUrl
+    value: 'https://YOUR_PRODUCTION_DOMAIN.vercel.app'
+    enabled: true
+
+  - key: apiKey
+    value: 'ezk_live_YOUR_PROD_API_KEY'
+    enabled: true
+
+  - key: bearerToken
+    value: ''
+    enabled: true
+
+  - key: tenantId
+    value: 'e2200000-0000-4000-8000-000000000001'
+    enabled: true
+
+  # Supabase
+  - key: supabaseUrl
+    value: 'https://YOUR_PROJECT.supabase.co'
+    enabled: true
+
+  - key: supabaseAnonKey
+    value: 'YOUR_SUPABASE_ANON_KEY'
+    enabled: true
+
+  # SMS Gateway (TextSMS / Advanta)
+  - key: smsProvider
+    value: 'textsms'
+    enabled: true
+
+  - key: smsApiKey
+    value: 'YOUR_SMS_API_KEY'
+    enabled: true
+
+  - key: smsPartnerId
+    value: 'YOUR_SMS_PARTNER_ID'
+    enabled: true
+
+  - key: smsSenderId
+    value: 'EZZAH'
+    enabled: true
+
+  # M-Pesa (Production)
+  - key: mpesaEnv
+    value: 'production'
+    enabled: true
+
+  - key: mpesaShortcode
+    value: 'YOUR_PROD_SHORTCODE'
+    enabled: true
+
+  - key: mpesaConsumerKey
+    value: 'YOUR_MPESA_CONSUMER_KEY'
+    enabled: true
+
+  - key: mpesaConsumerSecret
+    value: 'YOUR_MPESA_CONSUMER_SECRET'
+    enabled: true
+
+  - key: mpesaCallbackUrl
+    value: 'https://YOUR_PRODUCTION_DOMAIN.vercel.app/webhooks/mpesa'
+    enabled: true
+
+  # Test data
+  - key: campaignId
+    value: ''
+    enabled: true
+
+  - key: senderId
+    value: ''
+    enabled: true
+
+  - key: checkoutRequestId
+    value: ''
+    enabled: true
+
+  - key: phoneNumber
+    value: '254700000000'
+    enabled: true
