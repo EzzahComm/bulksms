@@ -1,0 +1,105 @@
+/* EZZAHCOMM Bulk SMS — marketing site styles
+   Built on Bootstrap 5.3 (loaded via CDN). Brand-aligned, lightweight. */
+
+:root {
+  --brand-primary: #059669;   /* emerald */
+  --brand-primary-dark: #047857;
+  --brand-accent: #ec4899;    /* rose  */
+  --ink: #0f172a;             /* hero / dark */
+  --ink-2: #1e293b;
+  --muted: #64748b;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #334155;
+  padding-top: 72px; /* fixed navbar height */
+}
+
+h1, h2, h3, h4, h5 { font-weight: 700; color: var(--ink); }
+
+a { text-decoration: none; }
+
+/* ---------- Brand helpers ---------- */
+.text-brand-accent { color: var(--brand-accent) !important; }
+.text-brand-primary { color: var(--brand-primary) !important; }
+.bg-ink { background: var(--ink) !important; }
+
+.btn-primary {
+  --bs-btn-bg: var(--brand-primary);
+  --bs-btn-border-color: var(--brand-primary);
+  --bs-btn-hover-bg: var(--brand-primary-dark);
+  --bs-btn-hover-border-color: var(--brand-primary-dark);
+  --bs-btn-active-bg: var(--brand-primary-dark);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--brand-primary);
+  --bs-btn-border-color: var(--brand-primary);
+  --bs-btn-hover-bg: var(--brand-primary);
+  --bs-btn-hover-border-color: var(--brand-primary);
+}
+.link-accent { color: var(--brand-accent); }
+
+/* ---------- Header / nav ---------- */
+.navbar { padding: .6rem 0; }
+.navbar-brand small { letter-spacing: 2px; font-size: .62rem; }
+.navbar .nav-link { font-weight: 600; color: #1f2937; }
+.navbar .nav-link:hover,
+.navbar .nav-link.active { color: var(--brand-accent); }
+
+/* ---------- Hero ---------- */
+.hero {
+  background: radial-gradient(1200px 500px at 70% -10%, #1e3a8a55, transparent),
+              linear-gradient(135deg, var(--ink) 0%, var(--ink-2) 100%);
+  color: #fff;
+  min-height: 88vh;
+  display: flex;
+  align-items: center;
+}
+.hero .lead { color: rgba(255,255,255,.85); }
+.hero .eyebrow {
+  letter-spacing: 3px; text-transform: uppercase; font-size: .75rem; font-weight: 700;
+  color: var(--brand-accent);
+}
+
+/* page hero (sub-pages) */
+.page-hero {
+  background: linear-gradient(135deg, var(--ink) 0%, var(--ink-2) 100%);
+  color: #fff; padding: 3.5rem 0;
+}
+
+/* ---------- Cards / features ---------- */
+.feature-icon {
+  width: 56px; height: 56px; border-radius: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #ecfdf5; color: var(--brand-primary); font-size: 1.5rem;
+}
+.card {
+  border: 1px solid #eef2f7; border-radius: 16px;
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+.card:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(2,6,23,.08); }
+
+.price-tag { font-size: 1.5rem; font-weight: 800; color: var(--brand-primary); }
+
+/* code block for API page */
+pre.code {
+  background: #0b1220; color: #e2e8f0; border-radius: 12px;
+  padding: 1.25rem 1.5rem; overflow-x: auto; font-size: .85rem; line-height: 1.6;
+}
+pre.code .tok { color: #7dd3fc; }
+
+/* ---------- CTA band ---------- */
+.cta-band { background: var(--brand-primary); color: #fff; }
+
+/* ---------- Footer ---------- */
+footer.site-footer { background: var(--ink); color: #cbd5e1; }
+footer.site-footer a { color: #cbd5e1; }
+footer.site-footer a:hover { color: #fff; }
+footer.site-footer .footer-head { color: #fff; }
+
+/* ---------- misc ---------- */
+.section { padding: 4.5rem 0; }
+.bg-soft { background: #f8fafc; }
