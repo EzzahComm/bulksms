@@ -314,7 +314,7 @@ Returns the current wallet balance for the authenticated tenant.
 
 #### `GET /api/wallet/transactions` — List Wallet Transactions
 
-Returns a paginated list of wallet transactions (top-ups, deductions).
+Returns a paginated list of wallet transactions (top-ups and deductions).
 
 **Query Parameters**
 
@@ -467,7 +467,7 @@ Initiates an M-Pesa STK push to the specified phone number to top up SMS credits
 }
 ```
 
-> **Note:** Use `checkout_request_id` to poll the transaction status. Save it to the `{{checkoutRequestId}}` environment variable.
+> **Note:** Save the `checkout_request_id` to the `{{checkoutRequestId}}` environment variable to poll the transaction status.
 
 ---
 
